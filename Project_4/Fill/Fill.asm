@@ -1,4 +1,4 @@
-// This file is part of www.nand2tetris.org
+// This file is derived from www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
 // File name: projects/4/Fill.asm
@@ -9,20 +9,18 @@
 // the screen should be cleared.
 
 //    screen_start = SCREEN
-//    screen_end = SCREEN + ???
+//    screed_end   = 24575
 //
 // LOOP (while True):
+//    screen_addr = screen_start
 //    if key == pressed goto BLACK_SCREEN
-//    else 
-//        screen_addr = screen_start
-//        if screen_addr >= screen_end goto LOOP
-//            else
-//                RAM[screen_addr] = 0
-//                screen_addr = screen_addr + 1 // advances screen memory map index
-//                goto LOOP 
+//    elif screen_addr >= screen_end goto LOOP
+//    else
+//        RAM[screen_addr] = 0
+//        screen_addr = screen_addr + 1 // advances screen memory map index
+//        goto LOOP 
 //
 // BLACK_SCREEN
-//    screen_addr = screen_start
 //    if screen_addr >= screen_end goto LOOP
 //    else
 //        RAM[screen_addr] = -1
@@ -40,7 +38,7 @@
     @24575
     D=A
     @screen_end
-    M=D       // address = 24575 (last addr of screen)
+    M=D            // address = 24575 (last addr of screen)
 
 (LOOP)
 
@@ -54,7 +52,7 @@
     @KBD
     D=M
     @BLACK_SCREEN
-    D;JNE // if key == pressed goto BLACK_SCREEN
+    D;JNE  // if key == pressed goto BLACK_SCREEN
 
 (WHITE_SCREEN)
     @screen_end

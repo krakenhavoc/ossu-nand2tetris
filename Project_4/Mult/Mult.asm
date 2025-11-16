@@ -10,7 +10,7 @@
 // RAM[2] = RAM[0] * RAM[1], where x = R0; y = R1; result = R2 
 
 // result = 0
-// for (i = 1; i < y; i++ ) {
+// for (i = 0; i < y; i++ ) {
 //    result = x + x
 // }
 
