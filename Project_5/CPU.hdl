@@ -1,0 +1,132 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // Get Instruction Type
+    Xor(a=instruction[15], b=true, out=addressBitSet);
+    And(a=instruction[15], b=true, out=computeBitSet);
+
+    // Get Memory Storage Destinations
+    And(a=computeBitSet, b=instruction[5], out=writeA);
+    And(a=computeBitSet, b=instruction[4], out=writeD);
+    And(a=computeBitSet, b=instruction[3], out=writeM);
+
+    // Feeds into A Register
+	Mux16(
+        a=instruction, 
+        b=fromALU, 
+        sel=computeBitSet, 
+        out=fromMuxtoA);
+
+    // A Register
+    Or(a=addressBitSet, b=writeA, out=loadA);
+    ARegister(
+        in=fromMuxtoA, 
+        load=loadA, 
+        out=fromA,
+        out[0..14]=addressM);
+
+    // Handles Jumps
+    Not(in=ngOut, out=positive);
+    Not(in=zrOut, out=nonzero);
+
+    // Get Set Jump Bits
+    And(a=instruction[0], b=instruction[1], out=jumpBits0and1Set);
+    And(a=instruction[1], b=instruction[2], out=jumpBits1and2Set);
+    And(a=instruction[0], b=instruction[2], out=jumpBits0and2Set);
+
+    //// Unconditional Jump
+    And(a=jumpBits0and1Set, b=jumpBits1and2Set, out=jmp);
+
+    //// Jump if less than or equal to zero
+    Or(a=ngOut, b=zrOut, out=lessThanOrEqualToZero);
+    And(a=jumpBits1and2Set, b=lessThanOrEqualToZero, out=jle);
+
+    //// Jump if not equal to zero
+    Not(in=zrOut, out=notZero);
+    And(a=jumpBits0and2Set, b=notZero, out=jne);
+
+    //// Jump if less than zero
+    And(a=ngOut, b=nonzero, out=lessThanZero);
+    And(a=instruction[2], b=lessThanZero, out=jlt);
+
+    //// Jump if greater than or equal to zero
+    Or(a=positive, b=zrOut, out=greaterThanOrEqualToZero);
+    And(a=jumpBits0and1Set, b=greaterThanOrEqualToZero, out=jge);
+
+    //// Jump if equal to zero
+    And(a=instruction[1], b=zrOut, out=jeq);
+
+    //// Jump if greater than zero
+    And(a=nonzero, b=positive, out=greaterThanZero);
+    And(a=instruction[0], b=greaterThanZero, out=jgt);
+
+    //// Jump if any are true and is compute instruction
+    Or8Way(
+        in[0]=jgt, 
+        in[1]=jeq, 
+        in[2]=jge, 
+        in[3]=jlt, 
+        in[4]=jne, 
+        in[5]=jle, 
+        in[6]=jmp, 
+        in[7]=false, 
+        out=jump);
+    And(a=jump, b=computeBitSet, out=loadPC);
+
+    // Program Counter
+    Not(in=loadPC, out=notLoadPC);
+    Not(in=reset, out=notReset);
+    And(a=notLoadPC, b=notReset, out=inc);
+    PC(in=fromA, load=loadPC, inc=inc , reset=reset, out[0..14]=pc);
+
+    // Feeds into ALU
+    Mux16(a=fromA, b=inM, sel=instruction[12], out=y);
+
+    // D Register
+    DRegister(in=fromALU, load=writeD, out=x);
+
+    ALU(
+        x=x, 
+        y=y, 
+        zx=instruction[11], 
+        nx=instruction[10], 
+        zy=instruction[9], 
+        ny=instruction[8], 
+        f=instruction[7], 
+        no=instruction[6], 
+        out=outM, 
+        out=fromALU, 
+        zr=zrOut, 
+        ng=ngOut);
+}
