@@ -1,4 +1,4 @@
-// This file is part of www.nand2tetris.org
+// This file is derived from www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
 // File name: projects/5/Computer.hdl
@@ -18,5 +18,20 @@ CHIP Computer {
     IN reset;
 
     PARTS:
-    //// Replace this comment with your code.
+    ROM32K(
+        address=romAddr, 
+        out=instruction);
+    CPU(
+        inM=RAMOut, 
+        instruction=instruction, 
+        reset=reset, 
+        outM=RAMIn , 
+        writeM=loadRAM , 
+        addressM=RAMAddr, 
+        pc=romAddr);
+    Memory(
+        in=RAMIn, 
+        load=loadRAM, 
+        address=RAMAddr, 
+        out=RAMOut);
 }
