@@ -25,7 +25,13 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    DMux4Way(in=load, sel=address[13..14], a=loadR0, b=loadR1, c=loadR2, d=loadR3);
+    DMux4Way(
+        in=load, 
+        sel=address[13..14], 
+        a=loadR0, 
+        b=loadR1, 
+        c=loadR2, 
+        d=loadR3);
 
 	// 0-16383 Addresses RAM
     Or(a=loadR0, b=loadR1, out=loadRAM);
