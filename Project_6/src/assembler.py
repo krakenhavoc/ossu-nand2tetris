@@ -74,9 +74,6 @@ JUMP_TABLE = {
 # File > File
 # Consumes Assembly file '.asm' and produces Machine Code file '.hack'
 def main(fileName=sys.argv[1]):
-    # Read line by line
-    # Strip comments and whitespace
-    # Determine label, variable, or instruction type
     symbolTable = symbol_table_manager(initialize=True)
     parsedFilePath = parser(fileName, symbolTable)
     print(parsedFilePath)
@@ -95,7 +92,7 @@ def symbol_table_manager(initialize=False, st={}):
 # File Dictionary Integer > String
 # Consumes fn=fileName, st=symbolTable
 # Produces parsedFilePath
-def parser(fn, st, i):
+def parser(fn, st, i=0):
 
     if fn[-3:] == 'asm' and i == 0:
         tempFileName = fn + '.temp'
@@ -105,13 +102,14 @@ def parser(fn, st, i):
                 if strippedLine:
                     decodedLine = decoder(strippedLine, st)  # Only write non-empty lines
                     tempFile.write(decodedLine + '\n')
-        destFileName = tempFileName
+        destFileName = tempFileName # Remove this line once recursion is in place
     else:
         destFileName = fn.replace('.asm.temp', '.hack')
     
     return destFileName
 
-# String Dictionary > String  ## For v1. v2 will need more parameters to handle custom symbols
+## For v1. v2 will need more parameters to handle custom symbols
+# String Dictionary > String 
 # Consumes instruction, st=symbolTable and Produces binaryInstruction
 def decoder(instruction, st):
     binaryInstruction = [''] * 16  # Initialize a list of 16 characters
@@ -125,19 +123,24 @@ def decoder(instruction, st):
         value = int(address)
         binaryInstruction = '0' + format(value, '015b')
     else:  # C-instruction
-        binaryInstruction[0:3] = ['1', '1', '1']
-        dest, comp, jump = '', '', ''
+        dest, comp, jump = 'null', '0', 'null'
         if '=' in instruction:
             parts = instruction.split('=')
             dest = parts[0]
             comp = parts[1]
-            binaryInstruction[3]     = '0' if 'A' in comp else '1'
-            binaryInstruction[4:10]  = COMP_TABLE[comp]
-            binaryInstruction[10:13] = DEST_TABLE[dest]
-            binaryInstruction[13:]   = JUMP_TABLE['null']
+            binaryInstruction[3] = '0' if 'A' in comp else '1'
+        elif ';' in instruction:
+            parts = instruction.split(';')
+            comp = parts[0]
+            jump = parts[1]
+            binaryInstruction[3] = '0'
+
+        binaryInstruction[0:3] = ['1', '1', '1']
+        binaryInstruction[4:10]  = COMP_TABLE[comp]
+        binaryInstruction[10:13] = DEST_TABLE[dest]
+        binaryInstruction[13:]   = JUMP_TABLE[jump]
 
     return ''.join(binaryInstruction)
-
 
 if __name__ == '__main__':
     main()
