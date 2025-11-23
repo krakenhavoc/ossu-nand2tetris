@@ -1,22 +1,6 @@
-import sys, csv
+import sys
+import csv
 
-# Reference - C-instruction syntax: 111 a c1 c2 c3 c4 c5 c6 d1 d2 d3 j1 j2 j3
-# a: 0 for A register, 1 for M (memory at address A) instruction[3]
-# c1-c6: computation bits instruction[4:10]
-# d1-d3: destination bits instruction[10:13]
-# j1-j3: jump bits instruction[13:]
-# Build Symbol Table
-# Predefined symbols
-# Variable symbols
-# Labels
-# Instruction parsing
-# Take in assembly file
-# Read line by line
-# Strip comments and whitespace
-# Translate A-instructions
-# Translate C-instructions
-# Decimal to Binary conversion
-# Output binary file
 ###########
 # CONSTANTS
 ###########
@@ -71,74 +55,122 @@ JUMP_TABLE = {
     'JMP'   : '111'
 }
 
+
 # File > File
 # Consumes Assembly file '.asm' and produces Machine Code file '.hack'
 def main(fileName=sys.argv[1]):
     symbolTable = symbol_table_manager(initialize=True)
     parsedFilePath = parser(fileName, symbolTable)
     print(parsedFilePath)
+    # print(symbolTable)
     return 0
 
-# Produces symbolTable
-# !!! File Dictionary String > String
-def symbol_table_manager(initialize=False, st={}):
+# Boolean Dictionary String String > Dictionary
+def symbol_table_manager(initialize=False, st=None, k=None, v=None):
     if initialize:
-        with open('../data/symbol_table.csv', mode='r') as stFile:
+        with open('/Users/luke/devops/repos/LabXP/ossu-nand2tetris/Project_6/data/symbol_table.csv', mode='r') as stFile:
             reader = csv.reader(stFile)
             next(reader, None)  # skip header row
             st = {rows[0]: rows[1] for rows in reader}
+
+        return st
+
+    if st is None:
+        return {}
+
+    if k is None or v is None:
+        return st
+
+    st[k] = v
     return st
 
 # File Dictionary Integer > String
-# Consumes fn=fileName, st=symbolTable
-# Produces parsedFilePath
+# Consumes fn=fileName, st=symbolTable, i=iteration; Produces parsedFilePath
 def parser(fn, st, i=0):
 
-    if fn[-3:] == 'asm' and i == 0:
-        tempFileName = fn + '.temp'
+    if i == 0:  # Initial pass | strips whitespace, comments, and loads labels
+        tempFileName = fn.replace('.asm', '.asm.temp')
+        lineCounter = 0
+
         with open(fn, 'r') as sourceFile, open(tempFileName, 'w') as tempFile:
             for line in sourceFile:
-                strippedLine = line.split('//')[0].strip()  # Remove comments and whitespace
-                if strippedLine:
-                    decodedLine = decoder(strippedLine, st)  # Only write non-empty lines
-                    tempFile.write(decodedLine + '\n')
-        destFileName = tempFileName # Remove this line once recursion is in place
-    else:
-        destFileName = fn.replace('.asm.temp', '.hack')
-    
+                strippedLine = line.split('//')[0].strip()
+                if not strippedLine:
+                    continue
+
+                if strippedLine[0] == '(':  # Load symbol table with label
+                    label = strippedLine.split(')')[0][1:]
+                    st = symbol_table_manager(st=st, k=label, v=lineCounter)
+                    continue
+
+                tempFile.write(strippedLine + '\n')
+                lineCounter += 1
+
+        return parser(fn=tempFileName, st=st, i=1)
+
+    elif i == 1:  # Second pass | loads custom variables
+        tempFileName = fn.replace('.asm.temp', '.asm.temp2')
+        memAddr = 16
+
+        with open(fn, 'r') as sourceFile, open(tempFileName, 'w') as tempFile:
+            for line in sourceFile:
+                strippedLine = line.strip()
+                if strippedLine[0] == '@':
+                    try:
+                        int(strippedLine[1:])
+                        tempFile.write(line)
+                        continue
+                    except ValueError:
+                        custom_var = strippedLine[1:]
+
+                    if custom_var not in st:
+                        st = symbol_table_manager(st=st, k=custom_var, v=memAddr)
+                        memAddr += 1
+
+                    tempFile.write('@' + str(st[custom_var]) + '\n')
+                    continue
+
+                tempFile.write(line)
+
+        return parser(fn=tempFileName, st=st, i=2)
+
+    else:  # Final pass | writes machine code
+        destFileName = fn.replace('.asm.temp2', '.hack')
+
+        with open(fn, 'r') as sourceFile, open(destFileName, 'w') as destFile:
+            for line in sourceFile:
+                destFile.write(decoder(line.strip(), st) + '\n')
+
     return destFileName
 
-## For v1. v2 will need more parameters to handle custom symbols
 # String Dictionary > String 
 # Consumes instruction, st=symbolTable and Produces binaryInstruction
 def decoder(instruction, st):
     binaryInstruction = [''] * 16  # Initialize a list of 16 characters
 
-    match instruction[0]:
-        case '@':  # A-instruction
-            binaryInstruction[0] = '0'
-    
-    if binaryInstruction[0] == '0': # A-instruction
+    if instruction[0] == '@':  # A-instruction
         address = instruction[1:]
         value = int(address)
         binaryInstruction = '0' + format(value, '015b')
-    else:  # C-instruction
-        dest, comp, jump = 'null', '0', 'null'
-        if '=' in instruction:
-            parts = instruction.split('=')
-            dest = parts[0]
-            comp = parts[1]
-            binaryInstruction[3] = '0' if 'A' in comp else '1'
-        elif ';' in instruction:
-            parts = instruction.split(';')
-            comp = parts[0]
-            jump = parts[1]
-            binaryInstruction[3] = '0'
+        return ''.join(binaryInstruction)
 
-        binaryInstruction[0:3] = ['1', '1', '1']
-        binaryInstruction[4:10]  = COMP_TABLE[comp]
-        binaryInstruction[10:13] = DEST_TABLE[dest]
-        binaryInstruction[13:]   = JUMP_TABLE[jump]
+    # C-instruction
+    dest, comp, jump = 'null', '0', 'null'
+
+    if '=' in instruction:
+        parts = instruction.split('=')
+        dest = parts[0]
+        comp = parts[1]
+    elif ';' in instruction:
+        parts = instruction.split(';')
+        comp = parts[0]
+        jump = parts[1]
+
+    binaryInstruction[0:3] = ['1', '1', '1']
+    binaryInstruction[3] = '1' if 'M' in comp else '0'
+    binaryInstruction[4:10] = COMP_TABLE[comp]
+    binaryInstruction[10:13] = DEST_TABLE[dest]
+    binaryInstruction[13:] = JUMP_TABLE[jump]
 
     return ''.join(binaryInstruction)
 
